@@ -1,2 +1,3 @@
-# RideBike_NEST
-Nest.JS 프로젝트
+## Ride Bike
+
+Nest.JS 프로젝트입니다.
