@@ -5,14 +5,14 @@ export class UserAuthDto {
   id: number;
 
   @Expose()
-  email: string;
+  username: string;
 
   @Expose()
   nickname: string;
 
   @Expose()
-  access_token: string;
+  accessToken: string;
 
   @Expose()
-  refresh_token: string;
+  refreshToken: string;
 }

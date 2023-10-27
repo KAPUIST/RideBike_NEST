@@ -3,14 +3,13 @@ import { Expose } from 'class-transformer';
 import { IsEmail, IsString } from 'class-validator';
 export class LoginUserDto {
   @ApiProperty({
-    example: 'luke@example.com',
-    description: '이메일',
+    example: 'luke123',
+    description: '아이디',
     required: true,
   })
   @IsString()
-  @IsEmail()
   @Expose()
-  email: string;
+  username: string;
 
   @ApiProperty({
     example: 'password',

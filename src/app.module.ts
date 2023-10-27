@@ -5,8 +5,9 @@ import { ConfigModule, ConfigService } from '@nestjs/config';
 import { LoggerMiddleware } from './middleware/logger.middleware';
 import { UsersModule } from './users/users.module';
 import { TypeOrmModule } from '@nestjs/typeorm';
-import { Users } from './entities/Users';
+import { Users } from './entities/users/users';
 import { AuthModule } from './auth/auth.module';
+import { Password } from './entities/auth/auth.password';
 
 //외부서버로 불러오기
 // const getEnv = () => {
@@ -28,7 +29,7 @@ import { AuthModule } from './auth/auth.module';
           username: config.get<string>('DB_USERNAME'),
           password: config.get<string>('DB_PASSWORD'),
           database: config.get<string>('DB_DATABASE'),
-          entities: [Users],
+          entities: [Users, Password],
           synchronize: false,
           logging: true,
           keepConnectionAlive: true,

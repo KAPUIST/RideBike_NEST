@@ -1,72 +1,111 @@
 import {
-  BadRequestException,
-  HttpException,
+  Inject,
   Injectable,
-  NotFoundException,
   UnauthorizedException,
+  forwardRef,
 } from '@nestjs/common';
-import { JwtService } from '@nestjs/jwt';
-import { InjectRepository } from '@nestjs/typeorm';
+import { JwtModule, JwtService } from '@nestjs/jwt';
 import * as bcrypt from 'bcrypt';
-import { Users } from 'src/entities/Users';
-import { UsersService } from 'src/users/users.service';
+import { Users } from 'src/entities/users/users';
+
+import { UserAuthDto } from './dtos/user.auth.dto';
+import { ConfigService } from '@nestjs/config';
+import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 export interface Payload {
   sub: number;
-  email: string;
+  username: string;
 }
 @Injectable()
 export class AuthService {
   constructor(
-    @InjectRepository(Users) private repo: Repository<Users>,
+    @InjectRepository(Users) private usersRepository: Repository<Users>,
     private jwtService: JwtService,
-    private usersService: UsersService,
+    private configService: ConfigService,
   ) {}
-
-  async register(email: string, password: string, nickname: string) {
-    if (!email) {
-      throw new BadRequestException('이메일이 필요합니다.');
-    }
-    if (!password) {
-      throw new BadRequestException('비밀번호가 필요합니다.');
-    }
-    if (!nickname) {
-      throw new BadRequestException('닉네임이 필요합니다.');
-    }
-    const duplicatedUser = await this.usersService.find(email);
-    if (duplicatedUser) {
-      throw new UnauthorizedException('이미 존재하는 사용자 입니다.');
-    }
-
+  async hashedPassword(password: string) {
     const saltOrRounds = 10;
     const hash = await bcrypt.hash(password, saltOrRounds);
-    const user = await this.usersService.create(email, hash, nickname);
-    return user;
+    return hash;
   }
+  // async getJWT(id: number, email: string) {
+  //   //const user = await this.kakaoValidateUser(kakaoId);	// 카카오 정보 검증 및 회원가입 로직
+  //   const accessToken = await this.generateAccessToken(id, email); // AccessToken 생성
+  //   const refreshToken = await this.generateRefreshToken(id, email); // refreshToken 생성
+  //   return { accessToken, refreshToken };
+  // }
+  async generateAccessToken(id: number, username: string) {
+    const payload = { sub: id, username: username };
+    const accessToken = await this.jwtService.signAsync(payload);
+    console.log(accessToken);
+    return accessToken;
+  }
+  async generateRefreshToken(id: number, username: string) {
+    const payload = { sub: id, username: username };
 
-  //   async login(email: string, password: string) {
-  //     const user = await this.validateUser(email, password);
-  //     const payload = { sub: user.id, email: user.email };
-  //     return {
-  //       access_token: await this.jwtService.signAsync(payload),
-  //     };
-  //   }
-
-  async validateUser(email: string, password: string): Promise<any> {
-    const user = await this.usersService.find(email);
+    const refreshToken = await this.jwtService.signAsync(payload, {
+      secret: this.configService.get<string>('JWT_REFRESH_SECRET'),
+      expiresIn: this.configService.get<string>('JWT_REFRESH_EXPIRATION_TIME'),
+    });
+    const saltOrRounds = 10;
+    const currentRefreshToken = await bcrypt.hash(refreshToken, saltOrRounds);
+    const user = await this.usersRepository.findOne({
+      where: { username },
+      relations: ['password'],
+    });
     if (!user) {
       throw new UnauthorizedException('not found user');
     }
-    const validUser = await bcrypt.compare(password, user.password);
+    user.password.refreshToken = refreshToken;
+    await this.usersRepository.save(user);
+    return refreshToken;
+  }
+  // async kakaoValidateUser(email: string, password: string) {}
+  async validatePassword(user: Users, password: string): Promise<any> {
+    //const user = await this.usersService.find(email);
+
+    const validUser = await bcrypt.compare(password, user.password.password);
     if (!validUser) {
       throw new UnauthorizedException('wrong password');
     }
-    const payload = { sub: user.id, email: user.email };
-    return {
-      accessToken: await this.jwtService.signAsync(payload),
+
+    const accessToken = await this.generateAccessToken(user.id, user.username);
+
+    const refreshToken = await this.generateRefreshToken(
+      user.id,
+      user.username,
+    );
+    const userData: UserAuthDto = {
+      id: user.id,
+      username: user.username,
+      nickname: '',
+      accessToken: accessToken,
+      refreshToken: refreshToken,
     };
+
+    return userData;
   }
   async tokenValidateUser(payload: Payload) {
-    return await this.usersService.find(payload.email);
+    const user = await this.usersRepository.findOne({
+      where: { username: payload.username },
+    });
+
+    return user;
   }
+  async getkakaoJWT(id: number, email: string) {
+    const accessToken = this.generateAccessToken(id, email); // AccessToken 생성
+    const refreshToken = await this.generateRefreshToken(id, email); // refreshToken 생성
+    return { accessToken, refreshToken };
+  }
+  // async kakaoValidateUser(kakaoId: number) {
+  //   let user = await this.usersRepository.findUserByKakaoId(kakaoId); // 유저 조회
+  //   if (!user) {
+  //     // 회원 가입 로직
+  //     user = await this.usersRepository.create({
+  //       kakaoId,
+  //       provider: 'kakao',
+  //     });
+  //   }
+  //   return user;
+  // }
 }

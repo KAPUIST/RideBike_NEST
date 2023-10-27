@@ -3,7 +3,7 @@ export class UserDto {
   @Expose()
   id: number;
   @Expose()
-  email: string;
+  username: string;
   @Expose()
   nickname: string;
 }
